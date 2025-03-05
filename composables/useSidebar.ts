@@ -1,32 +1,29 @@
-// composables/useSidebar.ts
-import { ref } from 'vue';
+import { useRoute } from 'vue-router';
 
-export function useSidebar() {
-  const menuItems = ref([
+export const useSidebar = () => {
+  const route = useRoute();
+  const appConfig = useAppConfig(); // Access theme colors
+
+  const menuItems = [
     {
       label: 'USER MANAGEMENT',
       icon: 'pi pi-chevron-down',
       items: [
-        { label: 'Users', icon: 'pi pi-folder' },
-        { label: 'Performance', icon: 'pi pi-chart-bar' },
-        { label: 'Settings', icon: 'pi pi-cog' },
+        { label: 'Users', icon: 'pi pi-folder', path: '/app/users' },
+        { label: 'Modules', icon: 'pi pi-chart-bar', path: '/app/modules' },
+        { label: 'Roles', icon: 'pi pi-cog', path: '/app/roles' },
       ],
     },
-    {
-      label: 'APPLICATION',
-      icon: 'pi pi-chevron-down',
-      items: [
-        { label: 'Projects', icon: 'pi pi-folder' },
-        { label: 'Performance', icon: 'pi pi-chart-bar' },
-        { label: 'Settings', icon: 'pi pi-cog' },
-      ],
-    },
-  ]);
+  ];
 
-  const user = ref({
+  const user = {
     name: 'Amy Elsner',
     avatar: 'https://primefaces.org/cdn/primevue/images/avatar/amyelsner.png',
-  });
+  };
 
-  return { menuItems, user };
-}
+  const isActivePage = (path: string): boolean => {
+    return path === route.path;
+  };
+
+  return { menuItems, user, isActivePage, appConfig };
+};

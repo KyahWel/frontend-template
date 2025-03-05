@@ -1,4 +1,3 @@
-
 <template>
   <div class="overflow-y-auto">
     <ul class="list-none p-3">
@@ -19,10 +18,18 @@
         </div>
         <ul class="list-none p-0 m-0 overflow-hidden">
           <li v-for="(item, i) in menu.items" :key="i">
-            <a v-ripple class="flex align-items-center cursor-pointer p-3 text-lg   border-round text-700 hover:surface-100 transition-duration-150 transition-colors p-ripple">
-              <i :class="[item.icon, 'mr-2']"></i>
-              <span class="font-medium">{{ item.label }}</span>
-            </a>
+            <router-link v-slot="{ navigate }" :to="item.path" custom>
+              <div
+                v-ripple
+                @click="navigate"
+                class="flex align-items-center cursor-pointer p-3 text-lg border-round transition-duration-150 transition-colors p-ripple"
+                :class="{ 'active-menu': isActivePage(item.path) }"
+                :style="activeStyle(item.path)"
+              >
+                <i :class="[item.icon, 'mr-2']"></i>
+                <span class="font-medium">{{ item.label }}</span>
+              </div>
+            </router-link>
           </li>
         </ul>
       </li>
@@ -40,5 +47,15 @@
 <script setup>
 import { useSidebar } from '@/composables/useSidebar';
 
-const { menuItems, user } = useSidebar();
+const { menuItems, user, isActivePage, appConfig } = useSidebar();
+
+// Dynamic styles for active menu items
+const activeStyle = (path) => {
+  return isActivePage(path)
+    ? {
+        backgroundColor: appConfig.theme.token.colorPrimaryActive, // Background color from config
+        color: appConfig.theme.token.colorPrimaryBg, // Text color from config
+      }
+    : {};
+};
 </script>
