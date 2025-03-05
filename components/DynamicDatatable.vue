@@ -1,264 +1,115 @@
-
 <template>
-    <div>
-        <Card>
-            <template #content>
-                <Toolbar class="py-3 px-3 mb-3 border-none flex flex-wrap justify-content-between">
-                    <template #start>
-                        <IconField class="w-full md:w-auto mb-2 md:mb-0">
-                            <InputIcon>
-                                <i class="pi pi-search" />
-                            </InputIcon>
-                            <InputText v-model="filters['global'].value" :placeholder="`Search ${prop.module}...`" class="w-full md:w-auto" />
-                        </IconField>
+    <ClientOnly>
+        <div class="flex flex-col w-full">
+            <div class="room">
+                <Card class="w-full">
+                    <template #content>
+                        <div class="flex justify-between items-center p-2 w-full">
+                            <InputText v-if="props.searchable?.length" :placeholder="`Search ${props.model} by ${props.searchableText}`" @input="searchHandler" class="w-1/3"/>
+                            <div class="flex gap-2">
+                                <Button v-if="props.can?.includes('create')" label="Create" icon="pi pi-plus" @click="emit('create')" class="p-button-primary"/>
+        
+                            </div>
+                        </div>
                     </template>
-
-                    <template #end>
-                        <Button :label="`Create ${prop.module}`" icon="pi pi-plus" class="w-full md:w-auto" @click="openNew" />
+                </Card>
+            </div>
+            <div class="mt-2 w-full">
+                <Card class="w-full flex flex-col bg-gray-100">
+                    <template #content>
+                        <div class="flex justify-between items-center">
+                            <BasicResourceFilter v-if="props.filters?.length" :filters="props.filters" @apply="applyFilterHandler"/>
+                            <SelectButton v-if="!props.onlyView" v-model="currentView" :options="gridValues" class="font-semibold"/>
+                        </div>
+   
+                            <DataTable :value="[]" :paginator="true" :rows="pageSize" class="p-datatable-sm">
+                                <Column v-for="col in columns" :field="col.dataIndex" :header="col.title" :key="col.key">
+                                    <template #body="slotProps">
+                                        <span v-if="col.type == 'DATETIME'">{{ formatDate(slotProps.data[col.dataIndex],'datetime') }}</span>
+                        
+                                        <span v-if="col.type == 'ASSOCIATION'">{{ slotProps.data[col.dataIndex][col.field.associates] }}</span>
+                                    </template>
+                                </Column>
+                                <Column header="Action">
+                                    <template #body="{ data }">
+                                        <div class="flex gap-2">
+                                            <Button v-if="props.can?.includes('read')" icon="pi pi-eye" class="p-button-text" @click="emit('read', data)"/>
+                                            <Button v-if="props.can?.includes('update')" icon="pi pi-pencil" class="p-button-warning" @click="emit('update', data)"/>
+                                            <Button v-if="props.can?.includes('delete')" icon="pi pi-trash" class="p-button-danger" @click="emit('delete', data)"/>
+                                        </div>
+                                    </template>
+                                </Column>
+                            </DataTable>
                     </template>
-                </Toolbar>
-      
-            <DataTable
-                ref="dt"
-
-                :value="products"
-                dataKey="id"
-                :paginator="true"
-                :rows="10"
-                :filters="filters"
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-                :rowsPerPageOptions="[5, 10, 25]"
-                currentPageReportTemplate="Showing {first} to {last} of {totalRecords} products"
-            >
-               
-                <Column field="code" header="Code" sortable style="min-width: 12rem"></Column>
-                <Column field="name" header="Name" sortable style="min-width: 16rem"></Column>
-                <Column header="Image">
-                    <template #body="slotProps">
-                        <img :src="`https://primefaces.org/cdn/primevue/images/product/${slotProps.data.image}`" :alt="slotProps.data.image" class="rounded" style="width: 64px" />
-                    </template>
-                </Column>
-                <Column field="price" header="Price" sortable style="min-width: 8rem">
-                    <template #body="slotProps">
-                        {{ formatCurrency(slotProps.data.price) }}
-                    </template>
-                </Column>
-                <Column field="category" header="Category" sortable style="min-width: 10rem"></Column>
-                <Column field="rating" header="Reviews" sortable style="min-width: 12rem">
-                    <template #body="slotProps">
-                        <Rating :modelValue="slotProps.data.rating" :readonly="true" />
-                    </template>
-                </Column>
-                <Column field="inventoryStatus" header="Status" sortable style="min-width: 12rem">
-                    <template #body="slotProps">
-                        <Tag :value="slotProps.data.inventoryStatus" :severity="getStatusLabel(slotProps.data.inventoryStatus)" />
-                    </template>
-                </Column>
-                <Column :exportable="false" style="min-width: 12rem">
-                    <template #body="slotProps">
-                        <Button icon="pi pi-eye" outlined rounded class="mr-2" @click="editProduct(slotProps.data)" />
-                        <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="editProduct(slotProps.data)" />
-                        <Button icon="pi pi-trash" outlined rounded severity="danger" @click="confirmDeleteProduct(slotProps.data)" />
-                    </template>
-                </Column>
-            </DataTable>
-        </template>
-        </Card>
-	</div>
+                </Card>
+            </div>
+        </div>
+    </ClientOnly>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { FilterMatchMode } from '@primevue/core/api';
-import { useToast } from 'primevue/usetoast';
+import { ref, computed, reactive } from 'vue';
+import { useDateUtils } from '@/composables/useDateUtils';
+// import debounce from 'lodash.debounce';
 
-const toast = useToast();
-const dt = ref();
-
-let prop = defineProps(['module'])
-
-const productDialog = ref(false);
-const products = ref([
-{
-                    id: '1000',
-                    code: 'f230fh0g3',
-                    name: 'Bamboo Watch',
-                    description: 'Product Description',
-                    image: 'bamboo-watch.jpg',
-                    price: 65,
-                    category: 'Accessories',
-                    quantity: 24,
-                    inventoryStatus: 'INSTOCK',
-                    rating: 5
-                },
-                {
-                    id: '1001',
-                    code: 'nvklal433',
-                    name: 'Black Watch',
-                    description: 'Product Description',
-                    image: 'black-watch.jpg',
-                    price: 72,
-                    category: 'Accessories',
-                    quantity: 61,
-                    inventoryStatus: 'INSTOCK',
-                    rating: 4
-                },
-                {
-                    id: '1002',
-                    code: 'zz21cz3c1',
-                    name: 'Blue Band',
-                    description: 'Product Description',
-                    image: 'blue-band.jpg',
-                    price: 79,
-                    category: 'Fitness',
-                    quantity: 2,
-                    inventoryStatus: 'LOWSTOCK',
-                    rating: 3
-                },
-                {
-                    id: '1003',
-                    code: '244wgerg2',
-                    name: 'Blue T-Shirt',
-                    description: 'Product Description',
-                    image: 'blue-t-shirt.jpg',
-                    price: 29,
-                    category: 'Clothing',
-                    quantity: 25,
-                    inventoryStatus: 'INSTOCK',
-                    rating: 5
-                },
-                {
-                    id: '1004',
-                    code: 'h456wer53',
-                    name: 'Bracelet',
-                    description: 'Product Description',
-                    image: 'bracelet.jpg',
-                    price: 15,
-                    category: 'Accessories',
-                    quantity: 73,
-                    inventoryStatus: 'INSTOCK',
-                    rating: 4
-                },
-                {
-                    id: '1005',
-                    code: 'av2231fwg',
-                    name: 'Brown Purse',
-                    description: 'Product Description',
-                    image: 'brown-purse.jpg',
-                    price: 120,
-                    category: 'Accessories',
-                    quantity: 0,
-                    inventoryStatus: 'OUTOFSTOCK',
-                    rating: 4
-                }
-]);
-const selectedProducts = ref();
-const filters = ref({
-    'global': {value: null, matchMode: FilterMatchMode.CONTAINS},
+const { formatDate } = useDateUtils();
+// const { getData } = useAppResource();
+const emit = defineEmits(['create', 'read', 'update', 'delete']);
+const props = defineProps({
+    model: String,
+    searchableText: String,
+    searchable: Array,
+    filters: Array,
+    can: Array,
+    onlyView: String,
+    route: String,
+    includeRelationship: Array,
+    fields: Array,
+    columnCount: Number,
+    pageCount: Number,
+    association: Array,
+    canGenerateReport: Boolean
 });
-const submitted = ref(false);
-const statuses = ref([
-    {label: 'INSTOCK', value: 'instock'},
-    {label: 'LOWSTOCK', value: 'lowstock'},
-    {label: 'OUTOFSTOCK', value: 'outofstock'}
-]);
 
-const formatCurrency = (value) => {
-    if(value)
-        return value.toLocaleString('en-US', {style: 'currency', currency: 'USD'});
-    return;
-};
-const openNew = () => {
-    product.value = {};
-    submitted.value = false;
-    productDialog.value = true;
-};
-const hideDialog = () => {
-    productDialog.value = false;
-    submitted.value = false;
-};
-const saveProduct = () => {
-    submitted.value = true;
+const pageSize = ref(props.pageCount ?? 8);
+const currentView = ref(props.onlyView || 'GRID');
+const searchKeyword = ref('');
+const filters = ref({});
+const page = ref(1);
+const isSearching = ref(false);
+const gridValues = reactive(['GRID', 'TABLE']);
 
-    if (product?.value.name?.trim()) {
-        if (product.value.id) {
-            product.value.inventoryStatus = product.value.inventoryStatus.value ? product.value.inventoryStatus.value : product.value.inventoryStatus;
-            products.value[findIndexById(product.value.id)] = product.value;
-            toast.add({severity:'success', summary: 'Successful', detail: 'Product Updated', life: 3000});
-        }
-        else {
-            product.value.id = createId();
-            product.value.code = createId();
-            product.value.image = 'product-placeholder.svg';
-            product.value.inventoryStatus = product.value.inventoryStatus ? product.value.inventoryStatus.value : 'INSTOCK';
-            products.value.push(product.value);
-            toast.add({severity:'success', summary: 'Successful', detail: 'Product Created', life: 3000});
-        }
+// const columns = computed(() => {
+//     return props.fields.filter(field => field.isVisibleFromIndex).map(field => ({
+//         title: field.label,
+//         dataIndex: field.index,
+//         key: field.label,
+//         type: field.type,
+//         field
+//     })).concat([{ title: 'Action', key: 'action' }]);
+// });
 
-        productDialog.value = false;
-        product.value = {};
-    }
-};
-const editProduct = (prod) => {
-    product.value = {...prod};
-    productDialog.value = true;
-};
-const confirmDeleteProduct = (prod) => {
-    product.value = prod;
-    deleteProductDialog.value = true;
-};
-const deleteProduct = () => {
-    products.value = products.value.filter(val => val.id !== product.value.id);
-    deleteProductDialog.value = false;
-    product.value = {};
-    toast.add({severity:'success', summary: 'Successful', detail: 'Product Deleted', life: 3000});
-};
-const findIndexById = (id) => {
-    let index = -1;
-    for (let i = 0; i < products.value.length; i++) {
-        if (products.value[i].id === id) {
-            index = i;
-            break;
-        }
-    }
+// const searchHandler = debounce((e) => {
+//     isSearching.value = true;
+//     searchKeyword.value = e.target.value;
+//     isSearching.value = false;
+// }, 1000);
 
-    return index;
-};
-const createId = () => {
-    let id = '';
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for ( var i = 0; i < 5; i++ ) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return id;
-}
-const exportCSV = () => {
-    dt.value.exportCSV();
-};
-const confirmDeleteSelected = () => {
-    deleteProductsDialog.value = true;
-};
-const deleteSelectedProducts = () => {
-    products.value = products.value.filter(val => !selectedProducts.value.includes(val));
-    deleteProductsDialog.value = false;
-    selectedProducts.value = null;
-    toast.add({severity:'success', summary: 'Successful', detail: 'Products Deleted', life: 3000});
-};
+// const applyFilterHandler = debounce((filtersData) => {
+//     isSearching.value = true;
+//     filters.value = filtersData;
+//     isSearching.value = false;
+// }, 1000);
 
-const getStatusLabel = (status) => {
-    switch (status) {
-        case 'INSTOCK':
-            return 'success';
+// const query = computed(() => {
+//     let includes = props.includeRelationship ? props.includeRelationship.join(',') : '';
+//     let search = props.searchable ? props.searchable.map(field => `${field}:.*${searchKeyword.value}.*`) : '';
+//     let filter = Object.keys(filters.value).map(key => `${key}:${filters.value[key]}`);
+//     return { page: page.value, limit: pageSize.value, includes, search: filter.length ? filter : search };
+// });
 
-        case 'LOWSTOCK':
-            return 'warn';
-
-        case 'OUTOFSTOCK':
-            return 'danger';
-
-        default:
-            return null;
-    }
-};
-
+// const { data: resourceData } = await getData(`${props.route}`, query);
+// const dataSource = computed(() => {
+//     return resourceData.value?.response || { count: 0, rows: [] };
+// });
 </script>

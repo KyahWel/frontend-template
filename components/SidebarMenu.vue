@@ -12,14 +12,14 @@
             leaveToClass: 'hidden',
             leaveActiveClass: 'slideup',
           }"
-          class="p-3 flex align-items-center justify-content-between text-600 text-lg cursor-pointer p-ripple"
+          class="p-3 flex align-items-center justify-content-between text-600  cursor-pointer p-ripple"
         >
           <span class="font-medium">{{ menu.label }}</span>
           <i class="pi pi-chevron-down"></i>
         </div>
         <ul class="list-none p-0 m-0 overflow-hidden">
           <li v-for="(item, i) in menu.items" :key="i">
-            <a v-ripple class="flex align-items-center cursor-pointer p-3 text-lg   border-round text-700 hover:surface-100 transition-duration-150 transition-colors p-ripple">
+            <a v-ripple class="flex align-items-center cursor-pointer p-3  border-round text-700 hover:surface-100 transition-duration-150 transition-colors p-ripple">
               <i :class="[item.icon, 'mr-2']"></i>
               <span class="font-medium">{{ item.label }}</span>
             </a>
